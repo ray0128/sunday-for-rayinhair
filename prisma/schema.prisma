@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  DESIGNER
+  ASSISTANT
+  ROOKIE
+  MANAGER
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum LeaveRequestSource {
+  SELF
+  BINDING_MIRROR
+  MANAGER
+  SYSTEM
+}
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+  FORCE_APPROVE
+}
+
+model Store {
+  id       String  @id @default(cuid())
+  name     String
+  timezone String  @default("Asia/Taipei")
+  users    User[]
+  configs  Config[]
+}
+
+model User {
+  id             String         @id @default(cuid())
+  storeId        String
+  store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  lineUserId     String?        @unique
+  displayName    String
+  role           Role
+  active         Boolean        @default(true)
+  baseDemand     Float?
+  baseSupply     Float?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  leaveRequests  LeaveRequest[]
+  approvals      Approval[]     @relation("ApprovalManager")
+  assistantLinks Binding[]      @relation("BindingAssistant")
+  designerLinks  Binding[]      @relation("BindingDesigner")
+  rookieBookings RookieBooking[]
+  demandOverrides DesignerDemandOverride[]
+}
+
+model Binding {
+  id          String   @id @default(cuid())
+  storeId     String
+  assistantId String
+  designerId  String
+  active      Boolean  @default(true)
+  startDate   String?
+  endDate     String?
+  createdAt   DateTime @default(now())
+
+  assistant User @relation("BindingAssistant", fields: [assistantId], references: [id], onDelete: Cascade)
+  designer  User @relation("BindingDesigner", fields: [designerId], references: [id], onDelete: Cascade)
+
+  @@index([assistantId])
+  @@index([designerId])
+  @@index([storeId])
+}
+
+model Config {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  key           String
+  valueJson     String
+  effectiveFrom String?
+  effectiveTo   String?
+  createdAt     DateTime @default(now())
+
+  @@unique([storeId, key, effectiveFrom])
+  @@index([storeId, key])
+}
+
+model LeaveRequest {
+  id              String             @id @default(cuid())
+  storeId         String
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date            String
+  status          LeaveRequestStatus @default(PENDING)
+  source          LeaveRequestSource @default(SELF)
+  createdByUserId String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  linkedToId      String?
+  linkedTo        LeaveRequest?      @relation("LeaveRequestLink", fields: [linkedToId], references: [id])
+  linkedFrom      LeaveRequest[]     @relation("LeaveRequestLink")
+  approvals       Approval[]
+
+  @@unique([userId, date])
+  @@index([storeId, date])
+  @@index([status])
+}
+
+model Approval {
+  id             String        @id @default(cuid())
+  storeId        String
+  leaveRequestId String
+  leaveRequest   LeaveRequest  @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+  managerId      String
+  manager        User          @relation("ApprovalManager", fields: [managerId], references: [id], onDelete: Cascade)
+  action         ApprovalAction
+  reason         String?
+  createdAt      DateTime      @default(now())
+
+  @@index([storeId])
+  @@index([leaveRequestId])
+  @@index([managerId])
+}
+
+model RookieBooking {
+  id        String   @id @default(cuid())
+  storeId   String
+  rookieId  String
+  rookie    User     @relation(fields: [rookieId], references: [id], onDelete: Cascade)
+  date      String
+  startMin  Int
+  endMin    Int
+  createdAt DateTime @default(now())
+
+  @@index([storeId, date])
+  @@index([rookieId, date])
+}
+
+model DesignerDemandOverride {
+  id         String   @id @default(cuid())
+  storeId    String
+  designerId String
+  designer   User     @relation(fields: [designerId], references: [id], onDelete: Cascade)
+  date       String
+  demand     Float
+  createdAt  DateTime @default(now())
+
+  @@unique([designerId, date])
+  @@index([storeId, date])
+}

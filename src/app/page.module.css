@@ -29,6 +29,16 @@
   padding: 120px 60px;
 }
 
+.title {
+  max-width: 520px;
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 48px;
+  letter-spacing: -2.4px;
+  text-wrap: balance;
+  color: var(--text-primary);
+}
+
 .intro {
   display: flex;
   flex-direction: column;
