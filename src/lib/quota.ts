@@ -1,4 +1,4 @@
-import type { Prisma, Role } from "@prisma/client";
+import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getBooleanConfig, getNumberConfig, getStringConfig } from "@/lib/config";
 import { dateFromMonthDay, daysInMonth, dayOfMonthInTimeZone, weekdayInTimeZone } from "@/lib/date";
@@ -60,7 +60,7 @@ export async function getMonthAvailability(params: {
   type UserRow = { id: string; role: Role; baseDemand: number | null; baseSupply: number | null };
   const users = (await prisma.user.findMany({
     where: { storeId, active: true },
-    select: { id: true, role: true, baseDemand: true, baseSupply: true } as unknown as Prisma.UserSelect,
+    select: { id: true, role: true, baseDemand: true, baseSupply: true },
   })) as unknown as UserRow[];
 
   const assistants = users.filter((u) => u.role === "ASSISTANT");

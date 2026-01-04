@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import type { JSX } from "react";
-import type { Prisma, Role } from "@prisma/client";
+import type { Role } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isIsoDate } from "@/lib/date";
@@ -234,12 +234,9 @@ async function updateUserParams(formData: FormData) {
 
   const baseDemand = parseNumberOrNull(rawBaseDemand);
   const baseSupply = parseNumberOrNull(rawBaseSupply);
-
-  const data = { baseDemand, baseSupply } as unknown as Prisma.UserUpdateInput;
-
   await prisma.user.update({
     where: { id: target.id },
-    data,
+    data: { baseDemand, baseSupply },
   });
 
   revalidatePath("/admin");
@@ -624,7 +621,7 @@ export default async function AdminPage() {
     baseDemand: true,
     baseSupply: true,
     lineUserId: true,
-  } as unknown as Prisma.UserSelect;
+  };
 
   const [requests, configs, bindings, users] = await Promise.all([
     prisma.leaveRequest.findMany({
