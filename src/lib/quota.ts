@@ -1,4 +1,4 @@
-import type { Prisma, Role } from ".prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getBooleanConfig, getNumberConfig, getStringConfig } from "@/lib/config";
 import { dateFromMonthDay, daysInMonth, dayOfMonthInTimeZone, weekdayInTimeZone } from "@/lib/date";

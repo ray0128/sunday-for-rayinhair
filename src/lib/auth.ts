@@ -1,6 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import type { Role, User } from ".prisma/client";
+import type { Role, User } from "@prisma/client";
 
 export type AuthUser = Pick<User, "id" | "storeId" | "role" | "displayName" | "lineUserId">;
 

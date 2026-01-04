@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import type { Prisma, Role } from ".prisma/client";
+import type { JSX } from "react";
+import type { Prisma, Role } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isIsoDate } from "@/lib/date";
