@@ -1,7 +1,8 @@
-import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getBooleanConfig, getNumberConfig, getStringConfig } from "@/lib/config";
 import { dateFromMonthDay, daysInMonth, dayOfMonthInTimeZone, weekdayInTimeZone } from "@/lib/date";
+
+type Role = "DESIGNER" | "ASSISTANT" | "ROOKIE" | "MANAGER";
 
 export type AvailabilityDay = {
   date: string;

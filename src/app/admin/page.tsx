@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import type { JSX } from "react";
-import type { Role } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isIsoDate } from "@/lib/date";
+
+const ROLE_OPTIONS = ["DESIGNER", "ASSISTANT", "ROOKIE", "MANAGER"] as const;
+type Role = (typeof ROLE_OPTIONS)[number];
 
 const CONFIG_LABELS: Record<
   string,
@@ -237,6 +239,50 @@ async function updateUserParams(formData: FormData) {
   await prisma.user.update({
     where: { id: target.id },
     data: { baseDemand, baseSupply },
+  });
+
+  revalidatePath("/admin");
+}
+
+async function updateUserRole(formData: FormData) {
+  "use server";
+  const userId = String(formData.get("userId") ?? "");
+  const role = String(formData.get("role") ?? "");
+  const me = await getCurrentUser();
+  if (!me || me.role !== "MANAGER") return;
+  if (!userId) return;
+  if (!ROLE_OPTIONS.includes(role as Role)) return;
+
+  const target = await prisma.user.findFirst({
+    where: { id: userId, storeId: me.storeId, active: true },
+    select: { id: true },
+  });
+  if (!target) return;
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: { role: role as Role },
+  });
+
+  revalidatePath("/admin");
+}
+
+async function unbindLine(formData: FormData) {
+  "use server";
+  const userId = String(formData.get("userId") ?? "");
+  const me = await getCurrentUser();
+  if (!me || me.role !== "MANAGER") return;
+  if (!userId) return;
+
+  const target = await prisma.user.findFirst({
+    where: { id: userId, storeId: me.storeId, active: true },
+    select: { id: true, lineUserId: true },
+  });
+  if (!target || !target.lineUserId) return;
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: { lineUserId: null },
   });
 
   revalidatePath("/admin");
@@ -904,7 +950,7 @@ export default async function AdminPage() {
         <table style={{ borderCollapse: "collapse", minWidth: 880 }}>
           <thead>
             <tr>
-              {["姓名", "職位", "需求值（設計師）", "支援值（助理 / 新秀）", "修改", "LINE 測試訊息"].map((h) => (
+              {["姓名", "職位", "需求值（設計師）", "支援值（助理 / 新秀）", "修改", "LINE 綁定", "LINE 測試訊息"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" }}>
                   {h}
                 </th>
@@ -915,7 +961,20 @@ export default async function AdminPage() {
             {typedUsers.map((u) => (
               <tr key={u.id}>
                 <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{u.displayName}</td>
-                <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{u.role}</td>
+                <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>
+                  <div>{u.role}</div>
+                  <form action={updateUserRole} style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>
+                    <input type="hidden" name="userId" value={u.id} />
+                    <select name="role" defaultValue={u.role} style={{ padding: "4px 6px" }}>
+                      {ROLE_OPTIONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                    <button style={{ padding: "6px 10px" }}>更新</button>
+                  </form>
+                </td>
                 <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>
                   {typeof u.baseDemand === "number" ? (
                     <code>{u.baseDemand}</code>
@@ -951,6 +1010,30 @@ export default async function AdminPage() {
                     </label>
                     <button style={{ padding: "6px 10px" }}>儲存</button>
                   </form>
+                </td>
+                <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>
+                  {u.lineUserId ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <code style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis" }}>{u.lineUserId}</code>
+                      <form action={unbindLine}>
+                        <input type="hidden" name="userId" value={u.id} />
+                        <button
+                          type="submit"
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            border: "1px solid #b00",
+                            background: "#fdd",
+                            color: "#b00",
+                          }}
+                        >
+                          解除綁定
+                        </button>
+                      </form>
+                    </div>
+                  ) : (
+                    <span style={{ color: "#777" }}>未綁定</span>
+                  )}
                 </td>
                 <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>
                   <form action={sendLineTestMessage}>
