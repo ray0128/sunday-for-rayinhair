@@ -101,6 +101,7 @@ export default function LeavePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [busyDate, setBusyDate] = useState<string | null>(null);
   const [bookingBusy, setBookingBusy] = useState(false);
+  const [detailDay, setDetailDay] = useState<AvailabilityDay | null>(null);
 
   useEffect(() => {
     let canceled = false;
@@ -169,6 +170,7 @@ export default function LeavePage() {
     }
     return map;
   }, [rookieBookings]);
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   async function requestLeave(date: string) {
     setBusyDate(date);
@@ -195,6 +197,18 @@ export default function LeavePage() {
         return;
       }
       setMessage(`已送出：${date}（待審核）`);
+      setAvailability((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          days: prev.days.map((d) =>
+            d.date === date ? { ...d, myLeaveStatus: "PENDING", myLeaveCancelable: true } : d,
+          ),
+        };
+      });
+      setDetailDay((prev) =>
+        prev && prev.date === date ? { ...prev, myLeaveStatus: "PENDING", myLeaveCancelable: true } : prev,
+      );
       const updatedRes = await fetch(`/api/calendar/availability?month=${encodeURIComponent(month)}`).catch(() => null);
       if (!updatedRes) return;
       const updated = (await safeReadJson(updatedRes)) as AvailabilityResponse | null;
@@ -218,6 +232,18 @@ export default function LeavePage() {
         return;
       }
       setMessage(`已清除：${date}`);
+      setAvailability((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          days: prev.days.map((d) =>
+            d.date === date ? { ...d, myLeaveStatus: null, myLeaveCancelable: false } : d,
+          ),
+        };
+      });
+      setDetailDay((prev) =>
+        prev && prev.date === date ? { ...prev, myLeaveStatus: null, myLeaveCancelable: false } : prev,
+      );
       const updatedRes = await fetch(`/api/calendar/availability?month=${encodeURIComponent(month)}`).catch(() => null);
       if (!updatedRes) return;
       const updated = (await safeReadJson(updatedRes)) as AvailabilityResponse | null;
@@ -384,13 +410,13 @@ export default function LeavePage() {
         style={{
           marginTop: 16,
           borderRadius: 12,
-          border: "1px solid #1f2937",
-          overflowX: "auto",
+          border: "1px solid #e5e7eb",
+          overflowX: "hidden",
           overflowY: "hidden",
-          background: "#020617",
+          background: "#ffffff",
         }}
       >
-        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 320 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead>
             <tr>
               {["日", "一", "二", "三", "四", "五", "六"].map((x) => {
@@ -401,11 +427,11 @@ export default function LeavePage() {
                     style={{
                       textAlign: "center",
                       padding: 8,
-                      borderBottom: "1px solid #111827",
+                      borderBottom: "1px solid #e5e7eb",
                       fontSize: 12,
                       fontWeight: 500,
-                      color: isWeekend ? "#f97373" : "#e5e7eb",
-                      background: "#030712",
+                      color: isWeekend ? "#dc2626" : "#4b5563",
+                      background: "#f9fafb",
                     }}
                   >
                     {x}
@@ -420,129 +446,105 @@ export default function LeavePage() {
                 {w.map((d, j) => {
                   if (!d)
                     return (
-                      <td
-                        key={j}
-                        style={{
-                          padding: 8,
-                          borderBottom: "1px solid #111827",
-                          minWidth: 0,
-                          height: 90,
-                        }}
-                      />
+                    <td
+                      key={j}
+                      style={{ padding: 6, borderBottom: "1px solid #e5e7eb", minWidth: 0, height: 72 }}
+                    />
                     );
                   const dayNum = d.date.slice(-2);
                   const hasMyLeave = d.myLeaveStatus !== null;
-                  const disabled = hasMyLeave || !d.selectable || busyDate === d.date;
+                  const isBusy = busyDate === d.date;
+                  const disabled = hasMyLeave || !d.selectable || isBusy;
                   const bg = d.selectable ? "#eaffea" : "#f4f4f4";
                   const fg = disabled ? "#777" : "#111";
-                  const offUsers = Array.isArray(d.offUsers) ? d.offUsers : [];
                   const myBookings = bookingsByDate.get(d.date) ?? [];
+                  const isToday = d.date === todayIso;
+                  const isWeekendCol = j === 0 || j === 6;
+                  let quotaLabel = "";
+                  let quotaBg = "#e5e7eb";
+                  let quotaColor = "#374151";
+                  if (d.remainingQuota > 0.5) {
+                    quotaLabel = "名額充足";
+                    quotaBg = "#dcfce7";
+                    quotaColor = "#166534";
+                  } else if (d.remainingQuota >= 0) {
+                    quotaLabel = "名額緊繃";
+                    quotaBg = "#fef9c3";
+                    quotaColor = "#854d0e";
+                  } else {
+                    quotaLabel = "名額不足";
+                    quotaBg = "#fee2e2";
+                    quotaColor = "#b91c1c";
+                  }
                   return (
                     <td
                       key={j}
+                      onClick={() => setDetailDay(d)}
                       style={{
                         verticalAlign: "top",
-                        padding: 8,
-                        borderBottom: "1px solid #111827",
+                        padding: 6,
+                        borderBottom: "1px solid #e5e7eb",
                         minWidth: 0,
-                        height: 90,
+                        height: 72,
+                        background: isToday ? "#eff6ff" : isWeekendCol ? "#f9fafb" : "#ffffff",
+                        cursor: "pointer",
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <strong style={{ fontSize: 14 }}>{Number(dayNum)}</strong>
+                        <strong style={{ fontSize: 13, color: isToday ? "#2563eb" : "#111827" }}>
+                          {Number(dayNum)}
+                        </strong>
                         <span
                           style={{
                             fontSize: 11,
                             borderRadius: 999,
                             padding: "2px 6px",
-                            background: d.remainingQuota > 0 ? "#dcfce7" : "#fee2e2",
-                            color: d.remainingQuota > 0 ? "#166534" : "#b91c1c",
+                            background: quotaBg,
+                            color: quotaColor,
                           }}
                         >
-                          餘 {d.remainingQuota.toFixed(1)}
+                          {quotaLabel}
                         </span>
-                      </div>
-                      <div style={{ marginTop: 2, fontSize: 10, color: "#9ca3af", lineHeight: 1.4 }}>
-                        助 {d.assistantSupply.toFixed(1)} + 新 {d.rookieSupply.toFixed(1)} − 設{" "}
-                        {d.designerDemand.toFixed(1)} × 安 {d.safetyFactor.toFixed(2)}
                       </div>
                       <button
                         disabled={disabled}
-                        onClick={() => requestLeave(d.date)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void requestLeave(d.date);
+                        }}
                         style={{
-                          marginTop: 8,
-                          width: "100%",
-                          padding: "6px 8px",
+                          marginTop: 6,
+                          padding: "4px 8px",
                           border: "1px solid #ddd",
                           borderRadius: 8,
                           background: bg,
                           color: fg,
                           cursor: disabled ? "not-allowed" : "pointer",
+                          fontSize: 12,
+                          maxWidth: "100%",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
                         }}
                       >
-                        {hasMyLeave ? `已排休（${leaveStatusToText(d.myLeaveStatus)}）` : "排休"}
+                        {hasMyLeave
+                          ? `已排休（${leaveStatusToText(d.myLeaveStatus)}）`
+                          : isBusy
+                          ? "送出中..."
+                          : "排休"}
                       </button>
-                      {hasMyLeave && d.myLeaveCancelable ? (
-                        <button
-                          disabled={busyDate === d.date}
-                          onClick={() => clearLeave(d.date)}
-                          style={{
-                            marginTop: 8,
-                            width: "100%",
-                            padding: "6px 8px",
-                            border: "1px solid #b00",
-                            borderRadius: 8,
-                            background: "#fdd",
-                            color: "#b00",
-                            cursor: busyDate === d.date ? "not-allowed" : "pointer",
-                          }}
-                        >
-                          清除
-                        </button>
-                      ) : null}
                       {!d.selectable && d.reasons.length > 0 ? (
                         <div style={{ marginTop: 6, fontSize: 11, color: "#9ca3af" }}>{reasonsToText(d.reasons)}</div>
                       ) : null}
-                      {offUsers.length > 0 ? (
-                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                          {offUsers.map((u) => {
-                            const pending = u.status === "PENDING";
-                            const isDesigner = u.role === "DESIGNER";
-                            const border = isDesigner ? "#2563eb" : "#f97316";
-                            const bg = isDesigner ? "#eff6ff" : "#fff7ed";
-                            const color = isDesigner ? "#1d4ed8" : "#c2410c";
-                            return (
-                              <div key={`${u.userId}:${u.status}`} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span
-                                  style={{
-                                    border: `1px solid ${border}`,
-                                    background: bg,
-                                    color,
-                                    borderRadius: 999,
-                                    padding: "2px 8px",
-                                    fontSize: 12,
-                                    lineHeight: "18px",
-                                    maxWidth: "100%",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {u.displayName}({roleToShort(u.role)})
-                                </span>
-                                {pending ? <span style={{ fontSize: 12, color: "#b00" }}>待審</span> : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-
                       {me.role === "ROOKIE" ? (
                         <div style={{ marginTop: 10 }}>
                           <div style={{ fontSize: 12, color: "#555" }}>預約客：{myBookings.length} 筆</div>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
                             <button
-                              onClick={() => void addFullDayBooking(d.date)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void addFullDayBooking(d.date);
+                              }}
                               disabled={bookingBusy}
                               style={{
                                 padding: "6px 8px",
@@ -558,7 +560,10 @@ export default function LeavePage() {
                             {myBookings.slice(0, 2).map((b) => (
                               <button
                                 key={b.id}
-                                onClick={() => removeBooking(b.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void removeBooking(b.id);
+                                }}
                                 style={{ padding: "6px 8px", border: "1px solid #ddd", borderRadius: 8 }}
                               >
                                 刪除 {b.startMin}-{b.endMin}
@@ -575,6 +580,126 @@ export default function LeavePage() {
           </tbody>
         </table>
       </div>
+      {detailDay ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 16,
+            zIndex: 50,
+          }}
+          onClick={() => setDetailDay(null)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              background: "#ffffff",
+              borderRadius: 16,
+              padding: 16,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {detailDay.date}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280" }}>
+              名額狀態：
+              {detailDay.remainingQuota > 0.5
+                ? "名額充足"
+                : detailDay.remainingQuota >= 0
+                ? "名額緊繃"
+                : "名額不足"}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 13 }}>
+              我的排假：
+            {detailDay.myLeaveStatus
+              ? `已排休（${leaveStatusToText(detailDay.myLeaveStatus)}）`
+              : "尚未排假"}
+            </div>
+            {detailDay.myLeaveCancelable && (
+              <button
+                disabled={busyDate === detailDay.date}
+                onClick={() => void clearLeave(detailDay.date)}
+                style={{
+                  marginTop: 8,
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #b91c1c",
+                  background: "#fef2f2",
+                  color: "#b91c1c",
+                  fontSize: 13,
+                  cursor: busyDate === detailDay.date ? "not-allowed" : "pointer",
+                }}
+              >
+                清除這一天的排假
+              </button>
+            )}
+            {detailDay.offUsers.length > 0 ? (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>這一天休假的人</div>
+                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {detailDay.offUsers.map((u) => {
+                    const pending = u.status === "PENDING";
+                    const isDesigner = u.role === "DESIGNER";
+                    const border = isDesigner ? "#2563eb" : "#f97316";
+                    const bg = isDesigner ? "#eff6ff" : "#fff7ed";
+                    const color = isDesigner ? "#1d4ed8" : "#c2410c";
+                    return (
+                      <div key={`${u.userId}:${u.status}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            border: `1px solid ${border}`,
+                            background: bg,
+                            color,
+                            borderRadius: 999,
+                            padding: "4px 10px",
+                            fontSize: 13,
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {u.displayName}({roleToShort(u.role)})
+                        </span>
+                        {pending ? <span style={{ fontSize: 12, color: "#b91c1c" }}>待審核</span> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginTop: 16, fontSize: 13, color: "#6b7280" }}>目前沒有其他人休這一天</div>
+            )}
+            {!detailDay.selectable && detailDay.reasons.length > 0 ? (
+              <div style={{ marginTop: 12, fontSize: 12, color: "#9ca3af" }}>
+                無法排假的原因：{reasonsToText(detailDay.reasons)}
+              </div>
+            ) : null}
+            <button
+              onClick={() => setDetailDay(null)}
+              style={{
+                marginTop: 18,
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "#f9fafb",
+                fontSize: 13,
+              }}
+            >
+              關閉
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

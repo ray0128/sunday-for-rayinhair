@@ -288,6 +288,27 @@ async function unbindLine(formData: FormData) {
   revalidatePath("/admin");
 }
 
+async function createUser(formData: FormData) {
+  "use server";
+  const me = await getCurrentUser();
+  if (!me || me.role !== "MANAGER") return;
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const role = String(formData.get("role") ?? "");
+  if (!displayName) return;
+  if (!ROLE_OPTIONS.includes(role as Role)) return;
+
+  await prisma.user.create({
+    data: {
+      storeId: me.storeId,
+      displayName,
+      role: role as Role,
+      active: true,
+    },
+  });
+
+  revalidatePath("/admin");
+}
+
 async function sendLineTestMessage(formData: FormData) {
   "use server";
   const userId = String(formData.get("userId") ?? "");
@@ -1059,6 +1080,28 @@ export default async function AdminPage() {
           </tbody>
         </table>
       </div>
+
+      <h3 style={{ marginTop: 16, fontSize: 16 }}>新增員工</h3>
+      <form
+        action={createUser}
+        style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", maxWidth: 520 }}
+      >
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span>姓名</span>
+          <input name="displayName" required style={{ padding: "6px 8px", minWidth: 160 }} />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span>職位</span>
+          <select name="role" style={{ padding: "6px 8px" }} defaultValue="DESIGNER">
+            {ROLE_OPTIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button style={{ padding: "6px 10px" }}>建立</button>
+      </form>
 
       <h2 style={{ marginTop: 22 }}>LINE 通知工具</h2>
       <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8, maxWidth: 520 }}>
